@@ -1,6 +1,6 @@
 "use client";
 
-import { History, Search, Trash2, Plus, LayoutGrid, FileText, ChevronDown } from "lucide-react";
+import { Search, Trash2, Plus, LayoutGrid, FileText, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
