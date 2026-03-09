@@ -2,13 +2,14 @@
 
 import { useState, useRef, useEffect } from "react";
 import gsap from "gsap";
-import { Copy, Loader2, Sparkles, Check, MessageCircle } from "lucide-react";
+import { Copy, Loader2, Sparkles, Check, MessageCircle, Plus, Lock, ArrowUp, Mic, MicOff, Volume2, VolumeX, History } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
 import ChatInterface from "./chat-interface";
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const CustomWindow = typeof window !== 'undefined' ? (window as unknown as any) : null;
+const SpeechRecognition = CustomWindow ? (CustomWindow.SpeechRecognition || CustomWindow.webkitSpeechRecognition) : null;
 
 export default function Generator() {
   const [topic, setTopic] = useState("");
@@ -17,9 +18,75 @@ export default function Generator() {
   const [error, setError] = useState<string | null>(null);
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
   const [selectedTitle, setSelectedTitle] = useState<string | null>(null);
+  const [history, setHistory] = useState<string[]>([]);
+
+  const [isListening, setIsListening] = useState(false);
+  const [voiceEnabled, setVoiceEnabled] = useState(true);
+  const recognitionRef = useRef<any>(null); // eslint-disable-line @typescript-eslint/no-explicit-any
 
   const containerRef = useRef<HTMLDivElement>(null);
   const resultsRef = useRef<HTMLDivElement>(null);
+
+  // Voice agent effect
+  useEffect(() => {
+    const savedHistory = localStorage.getItem("searchHistory");
+    if (savedHistory) {
+      try {
+        setHistory(JSON.parse(savedHistory));
+      } catch (e) {
+        console.error("Failed to parse history", e);
+      }
+    }
+
+    if (SpeechRecognition) {
+      recognitionRef.current = new SpeechRecognition();
+      recognitionRef.current.continuous = false;
+      recognitionRef.current.interimResults = false;
+
+      recognitionRef.current.onresult = (event: any) => { // eslint-disable-line @typescript-eslint/no-explicit-any
+        const transcript = event.results[0][0].transcript;
+        setTopic((prev) => (prev ? `${prev} ${transcript}` : transcript));
+        setIsListening(false);
+      };
+
+      recognitionRef.current.onerror = (event: any) => { // eslint-disable-line @typescript-eslint/no-explicit-any
+        console.error("Speech recognition error", event);
+        setIsListening(false);
+      };
+
+      recognitionRef.current.onend = () => {
+        setIsListening(false);
+      };
+    }
+
+    return () => {
+      if (window.speechSynthesis) {
+        window.speechSynthesis.cancel();
+      }
+    };
+  }, []);
+
+  const toggleListening = () => {
+    if (!recognitionRef.current) {
+      alert("Speech recognition is not supported in your browser. Please try Chrome.");
+      return;
+    }
+
+    if (isListening) {
+      recognitionRef.current.stop();
+    } else {
+      if (window.speechSynthesis) window.speechSynthesis.cancel();
+      recognitionRef.current.start();
+      setIsListening(true);
+    }
+  };
+
+  const speakText = (text: string) => {
+    if (!voiceEnabled || !window.speechSynthesis) return;
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(text);
+    window.speechSynthesis.speak(utterance);
+  };
 
   // Initial fade-in animation
   useEffect(() => {
@@ -44,8 +111,8 @@ export default function Generator() {
     }
   }, [titles]);
 
-  const handleGenerate = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleGenerate = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
     if (!topic.trim()) return;
 
     setLoading(true);
@@ -54,6 +121,10 @@ export default function Generator() {
     setSelectedTitle(null);
 
     try {
+      const updatedHistory = [topic, ...history.filter(t => t !== topic)].slice(0, 15);
+      setHistory(updatedHistory);
+      localStorage.setItem("searchHistory", JSON.stringify(updatedHistory));
+
       const response = await fetch("/api/generate", {
         method: "POST",
         headers: {
@@ -67,9 +138,18 @@ export default function Generator() {
       }
 
       const data = await response.json();
-      setTitles(data.titles || []);
+      const newTitles = data.titles || [];
+      setTitles(newTitles);
+
+      if (newTitles.length > 0) {
+        speakText(`I have generated ${newTitles.length} titles for you.`);
+      } else {
+        speakText("Sorry, I couldn't generate any titles.");
+      }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "An error occurred");
+      const errorMessage = err instanceof Error ? err.message : "An error occurred";
+      setError(errorMessage);
+      speakText("Sorry, an error occurred while generating titles.");
     } finally {
       setLoading(false);
     }
@@ -89,95 +169,147 @@ export default function Generator() {
   };
 
   return (
-    <div className="w-full max-w-2xl mx-auto p-4 flex flex-col items-center" ref={containerRef}>
-      <Card className="">
-        <Card className="bg-transparent ">
-          <CardHeader className="text-center space-y-4 pb-8">
+    <div className="w-full max-w-7xl mx-auto p-4 flex flex-col md:flex-row items-start justify-center min-h-[70vh] gap-8" ref={containerRef}>
 
-            <div className="mx-auto w-16 h-16 rounded-full flex items-center justify-center mb-2">
-              <Sparkles className="w-8 h-8 text-primary" />
-            </div>
-
-            <CardTitle className="text-4xl font-extrabold tracking-tight lg:text-5xl text-white">
-              AI Blog Title Generator
-            </CardTitle>
-
-            <CardDescription className="text-lg text-gray-200">
-              Enter a topic and let AI generate 10 catchy, SEO-optimized blog titles for your next big post.
-            </CardDescription>
-
-          </CardHeader>
-        </Card>
-        <CardContent>
-          <form onSubmit={handleGenerate} className="flex flex-col space-y-4">
-            <div className="flex gap-2 relative group">
-              <Input
-                placeholder="e.g., The Future of Artificial Intelligence..."
-                value={topic}
-                onChange={(e) => setTopic(e.target.value)}
-                className="h-14 text-lg border-primary/30 focus-visible:ring-primary transition-all duration-300 shadow-inner rounded-xl"
-                disabled={loading}
-              />
-            </div>
-            <Button
-              type="submit"
-              disabled={loading || !topic.trim()}
-              className="h-14 text-lg font-semibold rounded-xl w-full group overflow-hidden relative"
-              onMouseEnter={(e) => {
-                if (!loading) {
-                  gsap.to(e.currentTarget, { scale: 1.02, duration: 0.2, ease: "power1.out" });
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (!loading) {
-                  gsap.to(e.currentTarget, { scale: 1, duration: 0.2, ease: "power1.out" });
-                }
-              }}
+      {/* Sidebar - Search History */}
+      <div className="hidden md:flex flex-col w-64 min-w-[260px] bg-white/10 backdrop-blur-xl border border-white/20 rounded-3xl p-5 shadow-xl h-[500px] overflow-hidden sticky top-8 mt-12">
+        <h2 className="text-white font-bold text-xl mb-4 flex items-center gap-2">
+          <History className="w-5 h-5" /> Search History
+        </h2>
+        <div className="flex-1 overflow-y-auto space-y-2 pr-2 scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent">
+          {history.map((h, i) => (
+            <button
+              key={i}
+              onClick={() => setTopic(h)}
+              className="w-full text-left px-4 py-3 rounded-xl bg-white/5 hover:bg-white/20 border border-white/5 hover:border-white/20 text-white/90 transition-all text-sm truncate shadow-sm flex items-center gap-2 group"
+              title={h}
             >
-              <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300 ease-in-out" />
-              {loading ? (
-                <>
-                  <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                  Generating Magic...
-                </>
-              ) : (
-                <>
-                  <Sparkles className="mr-2 h-5 w-5" />
-                  Generate Titles
-                </>
-              )}
-            </Button>
-          </form>
+              <span className="w-2 h-2 rounded-full bg-indigo-400 opacity-50 group-hover:opacity-100 transition-opacity" />
+              <span className="truncate">{h}</span>
+            </button>
+          ))}
+          {history.length === 0 && (
+            <p className="text-white/50 text-sm italic py-4 text-center border border-white/10 border-dashed rounded-xl">No searches yet.</p>
+          )}
+        </div>
+      </div>
+
+      {/* Main Container */}
+      <div className="flex-1 w-full max-w-4xl flex flex-col items-center">
+        <div className="mb-8 space-y-4 text-center mt-12 w-full">
+          <h1 className="text-4xl md:text-5xl lg:text-5xl font-extrabold tracking-tight text-white mb-4 drop-shadow-md">
+            AI Blog Title Generator
+          </h1>
+          <p className="text-lg md:text-xl text-gray-200/90 max-w-2xl mx-auto font-medium drop-shadow-sm">
+            Enter a topic and let AI generate 10 catchy, SEO-optimized blog titles for your next big post.
+          </p>
+        </div>
+
+        <div className="w-full max-w-3xl">
+          <div className="w-full bg-white rounded-[2rem] p-2 shadow-2xl flex flex-col relative transition-all duration-300">
+            <textarea
+              placeholder={isListening ? "Listening... Speak now" : "Ask me about title..."}
+              value={topic}
+              onChange={(e) => setTopic(e.target.value)}
+              className="w-full min-h-[140px] px-6 py-5 text-slate-800 text-xl font-medium placeholder:text-gray-400 placeholder:font-normal bg-transparent border-none focus:outline-none focus:ring-0 resize-none rounded-t-3xl"
+              disabled={loading}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  handleGenerate();
+                }
+              }}
+            />
+
+            <div className="flex items-center justify-between px-4 pb-3 pt-2">
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  className="p-2 hover:bg-gray-100 rounded-full transition-colors relative flex items-center justify-center"
+                  onClick={() => document.getElementById('file-upload')?.click()}
+                  title="Insert Docs"
+                >
+                  <Plus className="w-6 h-6 text-gray-500" strokeWidth={2.5} />
+                  <input type="file" id="file-upload" className="hidden" multiple />
+                </button>
+
+                <button
+                  type="button"
+                  className={`p-2 rounded-full transition-colors relative flex items-center justify-center ${isListening ? 'bg-red-100 text-red-500 hover:bg-red-200' : 'hover:bg-gray-100 text-gray-500'}`}
+                  onClick={toggleListening}
+                  title={isListening ? "Stop Listening" : "Start Voice Typing"}
+                >
+                  {isListening ? (
+                    <span className="relative flex h-6 w-6 items-center justify-center">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                      <MicOff className="relative inline-flex h-5 w-5" />
+                    </span>
+                  ) : (
+                    <Mic className="w-6 h-6" strokeWidth={2.5} />
+                  )}
+                </button>
+
+                <button
+                  type="button"
+                  className={`p-2 rounded-full transition-colors relative flex items-center justify-center hover:bg-gray-100 ${voiceEnabled ? 'text-indigo-500' : 'text-gray-400'}`}
+                  onClick={() => {
+                    setVoiceEnabled(!voiceEnabled);
+                    if (voiceEnabled && window.speechSynthesis) window.speechSynthesis.cancel();
+                  }}
+                  title={voiceEnabled ? "Mute Voice Assistant" : "Enable Voice Assistant"}
+                >
+                  {voiceEnabled ? <Volume2 className="w-6 h-6" strokeWidth={2.5} /> : <VolumeX className="w-6 h-6" strokeWidth={2.5} />}
+                </button>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <button type="button" className="p-2 hover:bg-gray-100 rounded-full transition-colors" title="Privacy options">
+                  <Lock className="w-[22px] h-[22px] text-gray-400" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleGenerate()}
+                  disabled={loading || !topic.trim()}
+                  className={`p-2 rounded-full transition-all duration-300 flex items-center justify-center h-10 w-10 
+                  ${(loading || !topic.trim()) ? 'bg-gray-100' : 'bg-black hover:bg-gray-800'}`}
+                >
+                  {loading ? (
+                    <Loader2 className="w-5 h-5 text-gray-400 animate-spin" />
+                  ) : (
+                    <ArrowUp className={`w-5 h-5 ${!topic.trim() ? 'text-gray-300' : 'text-white'}`} strokeWidth={3} />
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
 
           {error && (
-            <div className="justify-center items-center flex text-destructive mt-4 font-medium">
+            <div className="text-center mt-6 text-red-300 bg-red-900/30 backdrop-blur-md p-3 rounded-lg border border-red-500/30">
               Error: {error}
             </div>
           )}
-        </CardContent>
 
-        {titles.length > 0 && (
-          <div className="w-full">
-            <Separator className="my-2 bg-primary/20" />
-            <CardFooter className="flex flex-col items-stretch pt-6" ref={resultsRef}>
-              <h3 className="text-xl font-bold mb-4 flex items-center text-primary">
+          {titles.length > 0 && (
+            <div className="mt-12 bg-white/95 backdrop-blur-xl rounded-3xl p-6 shadow-2xl overflow-hidden border border-white/20">
+              <h3 className="text-2xl font-bold mb-6 flex items-center text-slate-800">
+                <Sparkles className="mr-2 text-indigo-500" />
                 Your Generated Titles
               </h3>
-              <div className="space-y-3 w-full">
+              <div className="space-y-3 w-full" ref={resultsRef}>
                 {titles.map((title, index) => (
                   <div
                     key={index}
-                    className={`flex items-center justify-between p-4 rounded-xl border transition-all duration-200 shadow-sm
-                      ${selectedTitle === title ? 'border-primary ring-2 ring-primary/20 bg-primary/5' : 'border-primary/20 bg-background/60 hover:bg-background'}
-                    `}
+                    className={`flex items-start md:items-center justify-between p-4 rounded-xl border transition-all duration-300 shadow-sm
+                    ${selectedTitle === title ? 'border-indigo-500 ring-2 ring-indigo-500/20 bg-indigo-50/50' : 'border-slate-200 bg-white hover:bg-slate-50 hover:border-slate-300 hover:shadow-md'}
+                  `}
                   >
-                    <span className="font-medium pr-4 select-all text-slate-800">{title}</span>
-                    <div className="flex gap-1 shrink-0">
+                    <span className="font-medium pr-4 select-all text-slate-800 leading-relaxed">{title}</span>
+                    <div className="flex gap-2 shrink-0 mt-2 md:mt-0">
                       <Button
                         variant="ghost"
                         size="icon"
                         onClick={() => handleChatClick(title)}
-                        className={`transition-colors ${selectedTitle === title ? 'text-primary bg-primary/10' : 'text-slate-400 hover:text-indigo-600 hover:bg-indigo-50'}`}
+                        className={`transition-colors rounded-full ${selectedTitle === title ? 'text-indigo-600 bg-indigo-100 hover:bg-indigo-200' : 'text-slate-400 hover:text-indigo-600 hover:bg-indigo-50'}`}
                         title="Chat about this title"
                       >
                         <MessageCircle className="h-5 w-5" />
@@ -186,11 +318,11 @@ export default function Generator() {
                         variant="ghost"
                         size="icon"
                         onClick={() => copyToClipboard(title, index)}
-                        className="text-slate-400 hover:text-primary transition-colors hover:bg-primary/5"
+                        className="text-slate-400 hover:text-slate-800 transition-colors hover:bg-slate-100 rounded-full"
                         title="Copy to clipboard"
                       >
                         {copiedIndex === index ? (
-                          <Check className="h-5 w-5 text-green-500" />
+                          <Check className="h-5 w-5 text-emerald-500" />
                         ) : (
                           <Copy className="h-5 w-5" />
                         )}
@@ -199,19 +331,21 @@ export default function Generator() {
                   </div>
                 ))}
               </div>
-            </CardFooter>
-          </div>
-        )}
-      </Card>
+            </div>
+          )}
 
-      {/* Render Chat Interface when a title is selected */}
-      {selectedTitle && (
-        <ChatInterface
-          topic={topic}
-          selectedTitle={selectedTitle}
-          onClose={() => setSelectedTitle(null)}
-        />
-      )}
+          {/* Render Chat Interface when a title is selected */}
+          {selectedTitle && (
+            <div className="mt-8 bg-white/95 backdrop-blur-xl rounded-3xl p-6 shadow-2xl border border-white/20">
+              <ChatInterface
+                topic={topic}
+                selectedTitle={selectedTitle}
+                onClose={() => setSelectedTitle(null)}
+              />
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
