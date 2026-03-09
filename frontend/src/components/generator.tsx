@@ -54,7 +54,7 @@ export default function Generator() {
     setSelectedTitle(null);
 
     try {
-      const response = await fetch("http://localhost:8000/generate", {
+      const response = await fetch("/api/generate", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -90,19 +90,24 @@ export default function Generator() {
 
   return (
     <div className="w-full max-w-2xl mx-auto p-4 flex flex-col items-center" ref={containerRef}>
-      <Card className="w-full border-2 border-primary/20 shadow-xl bg-card/50 backdrop-white/50">
-        <CardHeader className="text-center space-y-4 pb-8">
-          <div className="mx-auto bg-primary/10 w-16 h-16 rounded-full flex items-center justify-center mb-2">
-            <Sparkles className="w-8 h-8 text-primary" />
-          </div>
-          <CardTitle className="text-4xl font-extrabold tracking-tight lg:text-5xl text-transparent bg-clip-text bg-gradient-to-r from-primary to-blue-600">
-            AI Blog Title Generator
-          </CardTitle>
-          <CardDescription className="text-lg">
-            Enter a topic and let AI generate 10 catchy, SEO-optimized blog titles for your next big post.
-          </CardDescription>
-        </CardHeader>
+      <Card className="">
+        <Card className="bg-transparent ">
+          <CardHeader className="text-center space-y-4 pb-8">
 
+            <div className="mx-auto w-16 h-16 rounded-full flex items-center justify-center mb-2">
+              <Sparkles className="w-8 h-8 text-primary" />
+            </div>
+
+            <CardTitle className="text-4xl font-extrabold tracking-tight lg:text-5xl text-white">
+              AI Blog Title Generator
+            </CardTitle>
+
+            <CardDescription className="text-lg text-gray-200">
+              Enter a topic and let AI generate 10 catchy, SEO-optimized blog titles for your next big post.
+            </CardDescription>
+
+          </CardHeader>
+        </Card>
         <CardContent>
           <form onSubmit={handleGenerate} className="flex flex-col space-y-4">
             <div className="flex gap-2 relative group">
