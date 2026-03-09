@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import gsap from "gsap";
-import { Copy, Loader2, Sparkles, Check, MessageCircle, Plus, Lock, ArrowUp, Mic, MicOff, Volume2, VolumeX, History } from "lucide-react";
+import { Copy, Loader2, Sparkles, Check, MessageCircle, Plus, Lock, ArrowUp, Mic, MicOff, Volume2, VolumeX } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import ChatInterface from "./chat-interface";
@@ -18,7 +18,6 @@ export default function Generator() {
   const [error, setError] = useState<string | null>(null);
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
   const [selectedTitle, setSelectedTitle] = useState<string | null>(null);
-  const [history, setHistory] = useState<string[]>([]);
 
   const [isListening, setIsListening] = useState(false);
   const [voiceEnabled, setVoiceEnabled] = useState(true);
@@ -29,15 +28,6 @@ export default function Generator() {
 
   // Voice agent effect
   useEffect(() => {
-    const savedHistory = localStorage.getItem("searchHistory");
-    if (savedHistory) {
-      try {
-        setHistory(JSON.parse(savedHistory));
-      } catch (e) {
-        console.error("Failed to parse history", e);
-      }
-    }
-
     if (SpeechRecognition) {
       recognitionRef.current = new SpeechRecognition();
       recognitionRef.current.continuous = false;
@@ -121,10 +111,6 @@ export default function Generator() {
     setSelectedTitle(null);
 
     try {
-      const updatedHistory = [topic, ...history.filter(t => t !== topic)].slice(0, 15);
-      setHistory(updatedHistory);
-      localStorage.setItem("searchHistory", JSON.stringify(updatedHistory));
-
       const response = await fetch("/api/generate", {
         method: "POST",
         headers: {
@@ -169,182 +155,156 @@ export default function Generator() {
   };
 
   return (
-    <div className="w-full max-w-7xl mx-auto p-4 flex flex-col md:flex-row items-start justify-center min-h-[70vh] gap-8" ref={containerRef}>
+    <div className="w-full max-w-4xl mx-auto p-4 flex flex-col items-center justify-center min-h-[70vh]" ref={containerRef}>
 
-      {/* Sidebar - Search History */}
-      <div className="hidden md:flex flex-col w-64 min-w-[260px] bg-white/10 backdrop-blur-xl border border-white/20 rounded-3xl p-5 shadow-xl h-[500px] overflow-hidden sticky top-8 mt-12">
-        <h2 className="text-white font-bold text-xl mb-4 flex items-center gap-2">
-          <History className="w-5 h-5" /> Search History
-        </h2>
-        <div className="flex-1 overflow-y-auto space-y-2 pr-2 scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent">
-          {history.map((h, i) => (
-            <button
-              key={i}
-              onClick={() => setTopic(h)}
-              className="w-full text-left px-4 py-3 rounded-xl bg-white/5 hover:bg-white/20 border border-white/5 hover:border-white/20 text-white/90 transition-all text-sm truncate shadow-sm flex items-center gap-2 group"
-              title={h}
-            >
-              <span className="w-2 h-2 rounded-full bg-indigo-400 opacity-50 group-hover:opacity-100 transition-opacity" />
-              <span className="truncate">{h}</span>
-            </button>
-          ))}
-          {history.length === 0 && (
-            <p className="text-white/50 text-sm italic py-4 text-center border border-white/10 border-dashed rounded-xl">No searches yet.</p>
-          )}
-        </div>
+      <div className="mb-8 space-y-4 text-center mt-12 w-full">
+        <h1 className="text-4xl md:text-5xl lg:text-5xl font-extrabold tracking-tight text-white mb-4 drop-shadow-md">
+          AI Blog Title Generator
+        </h1>
+        <p className="text-lg md:text-xl text-gray-200/90 max-w-2xl mx-auto font-medium drop-shadow-sm">
+          Enter a topic and let AI generate 10 catchy, SEO-optimized blog titles for your next big post.
+        </p>
       </div>
 
-      {/* Main Container */}
-      <div className="flex-1 w-full max-w-4xl flex flex-col items-center">
-        <div className="mb-8 space-y-4 text-center mt-12 w-full">
-          <h1 className="text-4xl md:text-5xl lg:text-5xl font-extrabold tracking-tight text-white mb-4 drop-shadow-md">
-            AI Blog Title Generator
-          </h1>
-          <p className="text-lg md:text-xl text-gray-200/90 max-w-2xl mx-auto font-medium drop-shadow-sm">
-            Enter a topic and let AI generate 10 catchy, SEO-optimized blog titles for your next big post.
-          </p>
-        </div>
+      <div className="w-full max-w-3xl">
+        <div className="w-full bg-white rounded-[2rem] p-2 shadow-2xl flex flex-col relative transition-all duration-300">
+          <textarea
+            placeholder={isListening ? "Listening... Speak now" : "Ask me about title..."}
+            value={topic}
+            onChange={(e) => setTopic(e.target.value)}
+            className="w-full min-h-[140px] px-6 py-5 text-slate-800 text-xl font-medium placeholder:text-gray-400 placeholder:font-normal bg-transparent border-none focus:outline-none focus:ring-0 resize-none rounded-t-3xl"
+            disabled={loading}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                handleGenerate();
+              }
+            }}
+          />
 
-        <div className="w-full max-w-3xl">
-          <div className="w-full bg-white rounded-[2rem] p-2 shadow-2xl flex flex-col relative transition-all duration-300">
-            <textarea
-              placeholder={isListening ? "Listening... Speak now" : "Ask me about title..."}
-              value={topic}
-              onChange={(e) => setTopic(e.target.value)}
-              className="w-full min-h-[140px] px-6 py-5 text-slate-800 text-xl font-medium placeholder:text-gray-400 placeholder:font-normal bg-transparent border-none focus:outline-none focus:ring-0 resize-none rounded-t-3xl"
-              disabled={loading}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                  e.preventDefault();
-                  handleGenerate();
-                }
-              }}
-            />
+          <div className="flex items-center justify-between px-4 pb-3 pt-2">
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                className="p-2 hover:bg-gray-100 rounded-full transition-colors relative flex items-center justify-center"
+                onClick={() => document.getElementById('file-upload')?.click()}
+                title="Insert Docs"
+              >
+                <Plus className="w-6 h-6 text-gray-500" strokeWidth={2.5} />
+                <input type="file" id="file-upload" className="hidden" multiple />
+              </button>
 
-            <div className="flex items-center justify-between px-4 pb-3 pt-2">
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  className="p-2 hover:bg-gray-100 rounded-full transition-colors relative flex items-center justify-center"
-                  onClick={() => document.getElementById('file-upload')?.click()}
-                  title="Insert Docs"
-                >
-                  <Plus className="w-6 h-6 text-gray-500" strokeWidth={2.5} />
-                  <input type="file" id="file-upload" className="hidden" multiple />
-                </button>
+              <button
+                type="button"
+                className={`p-2 rounded-full transition-colors relative flex items-center justify-center ${isListening ? 'bg-red-100 text-red-500 hover:bg-red-200' : 'hover:bg-gray-100 text-gray-500'}`}
+                onClick={toggleListening}
+                title={isListening ? "Stop Listening" : "Start Voice Typing"}
+              >
+                {isListening ? (
+                  <span className="relative flex h-6 w-6 items-center justify-center">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                    <MicOff className="relative inline-flex h-5 w-5" />
+                  </span>
+                ) : (
+                  <Mic className="w-6 h-6" strokeWidth={2.5} />
+                )}
+              </button>
 
-                <button
-                  type="button"
-                  className={`p-2 rounded-full transition-colors relative flex items-center justify-center ${isListening ? 'bg-red-100 text-red-500 hover:bg-red-200' : 'hover:bg-gray-100 text-gray-500'}`}
-                  onClick={toggleListening}
-                  title={isListening ? "Stop Listening" : "Start Voice Typing"}
-                >
-                  {isListening ? (
-                    <span className="relative flex h-6 w-6 items-center justify-center">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                      <MicOff className="relative inline-flex h-5 w-5" />
-                    </span>
-                  ) : (
-                    <Mic className="w-6 h-6" strokeWidth={2.5} />
-                  )}
-                </button>
+              <button
+                type="button"
+                className={`p-2 rounded-full transition-colors relative flex items-center justify-center hover:bg-gray-100 ${voiceEnabled ? 'text-indigo-500' : 'text-gray-400'}`}
+                onClick={() => {
+                  setVoiceEnabled(!voiceEnabled);
+                  if (voiceEnabled && window.speechSynthesis) window.speechSynthesis.cancel();
+                }}
+                title={voiceEnabled ? "Mute Voice Assistant" : "Enable Voice Assistant"}
+              >
+                {voiceEnabled ? <Volume2 className="w-6 h-6" strokeWidth={2.5} /> : <VolumeX className="w-6 h-6" strokeWidth={2.5} />}
+              </button>
+            </div>
 
-                <button
-                  type="button"
-                  className={`p-2 rounded-full transition-colors relative flex items-center justify-center hover:bg-gray-100 ${voiceEnabled ? 'text-indigo-500' : 'text-gray-400'}`}
-                  onClick={() => {
-                    setVoiceEnabled(!voiceEnabled);
-                    if (voiceEnabled && window.speechSynthesis) window.speechSynthesis.cancel();
-                  }}
-                  title={voiceEnabled ? "Mute Voice Assistant" : "Enable Voice Assistant"}
-                >
-                  {voiceEnabled ? <Volume2 className="w-6 h-6" strokeWidth={2.5} /> : <VolumeX className="w-6 h-6" strokeWidth={2.5} />}
-                </button>
-              </div>
-
-              <div className="flex items-center gap-3">
-                <button type="button" className="p-2 hover:bg-gray-100 rounded-full transition-colors" title="Privacy options">
-                  <Lock className="w-[22px] h-[22px] text-gray-400" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleGenerate()}
-                  disabled={loading || !topic.trim()}
-                  className={`p-2 rounded-full transition-all duration-300 flex items-center justify-center h-10 w-10 
+            <div className="flex items-center gap-3">
+              <button type="button" className="p-2 hover:bg-gray-100 rounded-full transition-colors" title="Privacy options">
+                <Lock className="w-[22px] h-[22px] text-gray-400" />
+              </button>
+              <button
+                type="button"
+                onClick={() => handleGenerate()}
+                disabled={loading || !topic.trim()}
+                className={`p-2 rounded-full transition-all duration-300 flex items-center justify-center h-10 w-10 
                   ${(loading || !topic.trim()) ? 'bg-gray-100' : 'bg-black hover:bg-gray-800'}`}
-                >
-                  {loading ? (
-                    <Loader2 className="w-5 h-5 text-gray-400 animate-spin" />
-                  ) : (
-                    <ArrowUp className={`w-5 h-5 ${!topic.trim() ? 'text-gray-300' : 'text-white'}`} strokeWidth={3} />
-                  )}
-                </button>
-              </div>
+              >
+                {loading ? (
+                  <Loader2 className="w-5 h-5 text-gray-400 animate-spin" />
+                ) : (
+                  <ArrowUp className={`w-5 h-5 ${!topic.trim() ? 'text-gray-300' : 'text-white'}`} strokeWidth={3} />
+                )}
+              </button>
             </div>
           </div>
+        </div>
 
-          {error && (
-            <div className="text-center mt-6 text-red-300 bg-red-900/30 backdrop-blur-md p-3 rounded-lg border border-red-500/30">
-              Error: {error}
-            </div>
-          )}
+        {error && (
+          <div className="text-center mt-6 text-red-300 bg-red-900/30 backdrop-blur-md p-3 rounded-lg border border-red-500/30">
+            Error: {error}
+          </div>
+        )}
 
-          {titles.length > 0 && (
-            <div className="mt-12 bg-white/95 backdrop-blur-xl rounded-3xl p-6 shadow-2xl overflow-hidden border border-white/20">
-              <h3 className="text-2xl font-bold mb-6 flex items-center text-slate-800">
-                <Sparkles className="mr-2 text-indigo-500" />
-                Your Generated Titles
-              </h3>
-              <div className="space-y-3 w-full" ref={resultsRef}>
-                {titles.map((title, index) => (
-                  <div
-                    key={index}
-                    className={`flex items-start md:items-center justify-between p-4 rounded-xl border transition-all duration-300 shadow-sm
+        {titles.length > 0 && (
+          <div className="mt-12 bg-white/95 backdrop-blur-xl rounded-3xl p-6 shadow-2xl overflow-hidden border border-white/20">
+            <h3 className="text-2xl font-bold mb-6 flex items-center text-slate-800">
+              <Sparkles className="mr-2 text-indigo-500" />
+              Your Generated Titles
+            </h3>
+            <div className="space-y-3 w-full" ref={resultsRef}>
+              {titles.map((title, index) => (
+                <div
+                  key={index}
+                  className={`flex items-start md:items-center justify-between p-4 rounded-xl border transition-all duration-300 shadow-sm
                     ${selectedTitle === title ? 'border-indigo-500 ring-2 ring-indigo-500/20 bg-indigo-50/50' : 'border-slate-200 bg-white hover:bg-slate-50 hover:border-slate-300 hover:shadow-md'}
                   `}
-                  >
-                    <span className="font-medium pr-4 select-all text-slate-800 leading-relaxed">{title}</span>
-                    <div className="flex gap-2 shrink-0 mt-2 md:mt-0">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleChatClick(title)}
-                        className={`transition-colors rounded-full ${selectedTitle === title ? 'text-indigo-600 bg-indigo-100 hover:bg-indigo-200' : 'text-slate-400 hover:text-indigo-600 hover:bg-indigo-50'}`}
-                        title="Chat about this title"
-                      >
-                        <MessageCircle className="h-5 w-5" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => copyToClipboard(title, index)}
-                        className="text-slate-400 hover:text-slate-800 transition-colors hover:bg-slate-100 rounded-full"
-                        title="Copy to clipboard"
-                      >
-                        {copiedIndex === index ? (
-                          <Check className="h-5 w-5 text-emerald-500" />
-                        ) : (
-                          <Copy className="h-5 w-5" />
-                        )}
-                      </Button>
-                    </div>
+                >
+                  <span className="font-medium pr-4 select-all text-slate-800 leading-relaxed">{title}</span>
+                  <div className="flex gap-2 shrink-0 mt-2 md:mt-0">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => handleChatClick(title)}
+                      className={`transition-colors rounded-full ${selectedTitle === title ? 'text-indigo-600 bg-indigo-100 hover:bg-indigo-200' : 'text-slate-400 hover:text-indigo-600 hover:bg-indigo-50'}`}
+                      title="Chat about this title"
+                    >
+                      <MessageCircle className="h-5 w-5" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => copyToClipboard(title, index)}
+                      className="text-slate-400 hover:text-slate-800 transition-colors hover:bg-slate-100 rounded-full"
+                      title="Copy to clipboard"
+                    >
+                      {copiedIndex === index ? (
+                        <Check className="h-5 w-5 text-emerald-500" />
+                      ) : (
+                        <Copy className="h-5 w-5" />
+                      )}
+                    </Button>
                   </div>
-                ))}
-              </div>
+                </div>
+              ))}
             </div>
-          )}
+          </div>
+        )}
 
-          {/* Render Chat Interface when a title is selected */}
-          {selectedTitle && (
-            <div className="mt-8 bg-white/95 backdrop-blur-xl rounded-3xl p-6 shadow-2xl border border-white/20">
-              <ChatInterface
-                topic={topic}
-                selectedTitle={selectedTitle}
-                onClose={() => setSelectedTitle(null)}
-              />
-            </div>
-          )}
-        </div>
+        {/* Render Chat Interface when a title is selected */}
+        {selectedTitle && (
+          <div className="mt-8 bg-white/95 backdrop-blur-xl rounded-3xl p-6 shadow-2xl border border-white/20">
+            <ChatInterface
+              topic={topic}
+              selectedTitle={selectedTitle}
+              onClose={() => setSelectedTitle(null)}
+            />
+          </div>
+        )}
       </div>
     </div>
   );
