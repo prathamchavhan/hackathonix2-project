@@ -135,16 +135,6 @@ Open [http://localhost:3000](http://localhost:3000) and start generating. ✦
 
 ---
 
-## ✦ Deploy on Vercel
-
-1. Push to GitHub
-2. Import project at [vercel.com]([https://vercel.com)](https://hackathonix2-project.vercel.app/)
-3. Set **Root Directory** → `frontend`
-4. Add `GROQ_API_KEY` in **Settings → Environment Variables**
-5. Hit Deploy 🚀
-
----
-
 ## ✦ API Reference
 
 | Endpoint | Method | Description |
